@@ -1,13 +1,16 @@
 from collections import namedtuple
 
 MachineState = namedtuple('MachineState', 'S E C D')
-Pair = namedtuple('Pair', 'car cdr')
+Cons = namedtuple('Cons', 'car cdr')
+Closure = namedtuple('Closure', 'frame env')
 Instruction = namedtuple('Instruction', 'op_code args')
 
 
 class UnknownInstructionError(Exception):
     pass
 
+class HaltException(Exception):
+    pass
 
 class Environment(object):
 
@@ -49,7 +52,7 @@ class Stack(object):
         self._parent = parent
         self._type = None
         self._item = None
-        
+
     def __len__(self):
         i = 0
         this = self
@@ -77,7 +80,7 @@ class Stack(object):
         return new_stack
 
     def __repr__(self):
-        return '[(%s %r) %r]' % (self._type, self._item, self._parent)        
+        return '[(%s %r) %r]' % (self._type, self._item, self._parent)
 
 
 instructions = {
@@ -91,6 +94,13 @@ instructions = {
     'a': 'AP',
     'p': 'RAP',
     'r': 'RET',
+    '.': 'CONS',
+    '(': 'CAR',
+    ')': 'CDR',
+    '+': 'ADD',
+    '*': 'MUL',
+    '=': 'EQ',
+    '!': 'HALT',
     'nil': 'NIL',
     'dum': 'DUM',
     'ldc': 'LDC',
@@ -100,24 +110,60 @@ instructions = {
     'sel': 'SEL',
     'ap': 'AP',
     'ret': 'RET',
+    'cons': 'CONS',
+    'car': 'CAR',
+    'cdr': 'CDR',
+    'add': 'ADD',
+    'mul': 'MUL',
+    'eq': 'eq',
+    'HALT': 'HALT',
 }
 
 
 class SECDMachine(object):
 
     def execute(self, instruction, state):
-        op_code, args = instruction
+        if len(instruction) == 2:
+            op_code, args = instruction
+        else:
+            op_code = instruction[0]
+            args = None
+        
+        if op_code in ('!', 'HALT'): # halt state
+            raise HaltException()
         operator = self.get_operator(op_code)
 
-        new_args = list(itertools.chain(args or [], [state]))
+        new_args = list((args or [])) + [state]
         return operator(*new_args)
 
     def get_operator(self, op_code):
+        print "op_code: ", op_code
         name = instructions.get(op_code, None)
+        print " name: ", name
         if not name:
             raise UnknownInstructionError("No instruction named '%s'" \
                                               % op_code)
         return getattr(self, 'op_%s' % name)
+
+    def run(self, state):
+        try:
+            while len(state.C):
+                instruction = state.C[0]
+                state = self.execute(instruction,
+                                     MachineState(state.S,
+                                                  state.E,
+                                                  state.C[1:],
+                                                  state.D))
+                self.dump_state(state)
+                raw_input('<hit enter for next next>')
+        except HaltException:
+            print ".HALTED"
+
+    def dump_state(self, state):
+        print 'S: ', state.S
+        print 'E: ', state.E
+        print 'C: ', state.C
+        print 'D: ', state.D
 
     def op_NIL(self, state):
         """nil pushes a nil pointer onto the stack"""
@@ -130,7 +176,7 @@ class SECDMachine(object):
         return MachineState(new_stack, state.E, state.C, state.D)
 
     def op_LD(self, p, state):
-        """ld pushes the value of a variable onto the stack. 
+        """ld pushes the value of a variable onto the stack.
 
         The variable is indicated by the argument, a pair. The pair's car
         specifies the level, the cdr the position. So "(1 . 3)" gives the
@@ -145,7 +191,7 @@ class SECDMachine(object):
         constructs a closure (a pair containing the function and the current
         environment) and pushes that onto the stack.
         """
-        new_stack = state.S.push('closure', pair(frame, state.E,))
+        new_stack = state.S.push('closure', Closure(frame, state.E,))
         return MachineState(new_stack, state.E, state.C, state.D)
 
     def op_SEL(self, consequent, alternate, state):
@@ -172,7 +218,7 @@ class SECDMachine(object):
         return MachineState(state.S, state.E, new_code, new_dump)
 
     def op_AP(self, state):
-        """ap pops a closure and a list of parameter values from the stack. 
+        """ap pops a closure and a list of parameter values from the stack.
 
         The closure is applied to the parameters by installing its
         environment as the current one, pushing the parameter list in
@@ -188,7 +234,7 @@ class SECDMachine(object):
         return MachineState(new_stack, new_env, closure[0], new_dump)
 
     def op_RAP(self, state):
-        """rap works like ap, only that it replaces an occurrence of a 
+        """rap works like ap, only that it replaces an occurrence of a
         dummy environment with the current one, thus making recursive
         functions possible
         """
@@ -203,9 +249,10 @@ class SECDMachine(object):
         """ret pops one return value from the stack, restores S, E, and C
         from the dump, and pushes the return value onto the now-current stack.
         """
-        old_stack, new_dump = state.D.pop()
-        old_env, new_dump = state.D.pop()
         old_code, new_dump = state.D.pop()
+        old_env, new_dump = state.D.pop()
+        old_stack, new_dump = state.D.pop()
+
         return MachineStack(old_stack, old_env, old_code, new_dump)
 
     def op_DUM(self, state):
@@ -214,3 +261,67 @@ class SECDMachine(object):
         """
         new_env = state.E.new_level()
         return MachineState(state.S, new_env, state.C, state.D)
+        
+    def op_CONS(self, state):
+        """cons pushes a cons to the stack made from the 2 top values of the
+        stack. 
+
+        The car of the cons will be the top value on the stack. 
+        The cdr of the cons will be the second value on the stack.
+        """
+        car, s = state.S.pop('value')
+        cdr, s = s.pop('value')
+        
+        new_stack = s.push('value', Cons(car, cdr))
+        return MachineState(new_stack, state.E, state.C, state.D)
+
+    def op_CAR(self, state):
+        """car pushes the car of a the cons on the top of the stack
+        """
+        cons, s = state.S.pop('value')
+        if not isinstance(cons, Cons):
+            raise ValueError("top value of the stack not a cons")
+        new_stack = s.push('value', cons.car)
+        return MachineState(new_stack, state.E, state.C, state.D)
+
+    def op_CDR(self, state):
+        """car pushes the car of a the cons on the top of the stack
+        """
+        cons, s = state.S.pop('value')
+        if not isinstance(cons, Cons):
+            raise ValueError("top value of the stack not a cons")
+        new_stack = s.push('value', cons.cdr)
+        return MachineState(new_stack, state.E, state.C, state.D)
+
+    def op_ADD(self, state):
+        """add pushes the sum of the top two values back onto the stack
+        """
+        op1, s = state.S.pop('value')
+        op2, s = s.pop('value')
+        if not (isinstance(op1, int) and isinstance(op2, int)):
+            raise ValueError("can't take the sum of non-integers")
+        new_stack = s.push('value', op1 + op2)
+        return MachineState(new_stack, state.E, state.C, state.D)
+
+    def op_MUL(self, state):
+        """mul pushes the product of the top two values back onto the stack
+        """
+        op1, s = state.S.pop('value')
+        op2, s = s.pop('value')
+        if not (isinstance(op1, int) and isinstance(op2, int)):
+            raise ValueError("can't take the product of non-integers")
+        new_stack = s.push('value', op1 + op2)
+        return MachineState(new_stack, state.E, state.C, state.D)
+
+    def op_EQ(self, state):
+        """eq pushes a non nil value to the stack if the top 2 stack 
+        values are equal. pushes nil (None) otherwise.
+        """
+        op1, s = state.S.pop('value')
+        op2, s = s.pop('value')
+        if op1 == op2:
+            new_value = 1
+        else:
+            new_value = None
+        new_stack = new_stack.push('value', new_value)
+        return MachineState(new_stack, state.E, state.C, state.D)
