@@ -11,9 +11,23 @@ Closure = namedtuple('Closure', 'frame env')
 Instruction = namedtuple('Instruction', 'op_code args')
 
 
+def cons2list(c):
+    """Does a flat mapcar across the cons starting at ``c``
+    
+    If c is not a proper list (e.g. the last cdr is not None), it will not
+    be included.
+    """
+    out = []
+    next = c
+    while isinstance(next, Cons):
+        out.append(next.car)
+        next = next.cdr
+    return out
+
+
 class SECDState(object):
     """Ensures things are kept with consistent types"""
-    
+
     __slots__ = ('_S', '_E', '_C', '_D')
 
     def __init__(self, S, E, C, D):
@@ -24,7 +38,7 @@ class SECDState(object):
 
     def _get_S(self):
         return self._S
-    
+
     def _set_S(self, s):
         if not isinstance(s, TypedStack):
             raise TypeError("S must be a TypedStack")
@@ -109,7 +123,7 @@ class SECDMachine(AbstractMachine):
         else:
             op_code = instruction[0]
             args = None
-        
+
         if op_code in ('!', 'HALT'): # halt state
             raise HaltException()
         operator = self.get_operator(op_code)
@@ -219,8 +233,12 @@ class SECDMachine(AbstractMachine):
         new_dump = state.D.push(state.S).push(state.E).push(state.C)
         closure, new_stack = state.S.pop('closure')
         parameters, new_stack = state.S.pop('value')
+        if not isinstance(parameters, Cons):
+            raise ValueError("top of stack expected to be a cons")
+        param_list = cons2list(parameters)
+
         new_stack = state.S.clear()
-        new_env = closure[1].new_level(parameters)
+        new_env = closure[1].new_level(param_list)
         return SECDState(new_stack, new_env, closure[0], new_dump)
 
     def op_RAP(self, state):
@@ -231,8 +249,12 @@ class SECDMachine(AbstractMachine):
         new_dump = state.D.push(state.S).push(state.E).push(state.C)
         closure, new_stack = state.S.pop('closure')
         parameters, new_stack = state.S.pop('value')
+        if not isinstance(parameters, Cons):
+            raise ValueError("top of stack expected to be a cons")
+        param_list = cons2list(parameters)
+
         new_stack = state.S.clear()
-        new_env = closure[1].replace_level(parameters)
+        new_env = closure[1].replace_level(param_list)
         return SECDState(new_stack, new_env, closure[0], new_dump)
 
     def op_RET(self, state):
@@ -251,17 +273,17 @@ class SECDMachine(AbstractMachine):
         """
         new_env = state.E.new_level()
         return SECDState(state.S, new_env, state.C, state.D)
-        
+
     def op_CONS(self, state):
         """cons pushes a cons to the stack made from the 2 top values of the
-        stack. 
+        stack.
 
-        The car of the cons will be the top value on the stack. 
+        The car of the cons will be the top value on the stack.
         The cdr of the cons will be the second value on the stack.
         """
         car, s = state.S.pop('value')
         cdr, s = s.pop('value')
-        
+
         new_stack = s.push('value', Cons(car, cdr))
         return SECDState(new_stack, state.E, state.C, state.D)
 
@@ -304,7 +326,7 @@ class SECDMachine(AbstractMachine):
         return SECDState(new_stack, state.E, state.C, state.D)
 
     def op_EQ(self, state):
-        """eq pushes a non nil value to the stack if the top 2 stack 
+        """eq pushes a non nil value to the stack if the top 2 stack
         values are equal. pushes nil (None) otherwise.
         """
         op1, s = state.S.pop('value')
