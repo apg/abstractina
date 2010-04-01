@@ -1,4 +1,4 @@
-from secd.machine import *
+from abstractina.machines.secd import *
 
 code = [
     ('ldc', (1,)),
@@ -7,5 +7,5 @@ code = [
 ]
 
 machine = SECDMachine()
-state = MachineState(Stack(), Environment(), code, Stack())
-machine.run(state)
+state = SECDState(TypedStack(), Environment(), code, Stack())
+machine.run(state, step=True)
