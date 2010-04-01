@@ -194,7 +194,7 @@ class SECDMachine(AbstractMachine):
         """
         conditional, new_stack = state.S.pop('value')
         new_dump = state.D.push(state.C)
-        new_code = consequent if is_null(condtional) else alternate
+        new_code = consequent if condtional is None else alternate
         return SECDState(new_stack, state.E, new_code, state.D)
 
     def op_JOIN(self, state):
