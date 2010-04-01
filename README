@@ -1,0 +1,10 @@
+The source contained within this repos is hearby released under
+the GPL version 3. At some point I'll go through the procedure
+of adding the preamble to files and such.
+
+Implementations of simple Abstract Machines
+
+Currently, there's an (untested) SECD machine with a few extra
+instructions, and an example program that conses the two values on
+the stack.
+
