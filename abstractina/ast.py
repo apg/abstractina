@@ -5,25 +5,29 @@ class AstNode(object):
 class Var(AstNode):
 
     def __init__(self, level, index, name=None):
-        self._level = level
-        self._index = index
-        self._name = name or 'var-%d-%d' % (level, index)
+        self.level = level
+        self.index = index
+        self.name = name or 'var-%d-%d' % (level, index)
 
 
 class Const(AstNode):
 
     def __init__(self, value):
-        self._value = value
+        self.value = value
 
 
 class BinOp(AstNode):
 
     def __init__(self, left, right):
-        self._left = left
-        self._right = right
+        self.left = left
+        self.right = right
 
 
 class AddOp(BinOp):
+    pass
+
+
+class SubOp(BinOp):
     pass
 
 
@@ -31,24 +35,28 @@ class MultOp(BinOp):
     pass
 
 
+class DivOp(BinOp):
+    pass
+
+
 class Apply(AstNode):
 
     def __init__(self, function, operands):
-        self._function = function
-        self._operands = operands
+        self.function = function
+        self.operands = operands
 
 
 class Definition(AstNode):
 
     def __init__(self, name, operands, body):
-        self._name = name
-        self._operands = operands
-        self._body = body
+        self.name = name
+        self.operands = operands
+        self.body = body
 
 
 class If(AstNode):
 
     def __init__(self, condition, consequent, alternate):
-        self._condition = condition
-        self._consequent = consequent
-        self._alternate = alternate
+        self.condition = condition
+        self.consequent = consequent
+        self.alternate = alternate

@@ -94,6 +94,8 @@ instructions = {
     ')': 'CDR',
     '+': 'ADD',
     '*': 'MUL',
+    '-': 'SUB',
+    '/': 'DIV',
     '=': 'EQ',
     '!': 'HALT',
     'nil': 'NIL',
@@ -110,6 +112,8 @@ instructions = {
     'cdr': 'CDR',
     'add': 'ADD',
     'mul': 'MUL',
+    'sub': 'SUB',
+    'div': 'DIV',
     'eq': 'eq',
     'HALT': 'HALT',
 }
@@ -238,7 +242,7 @@ class SECDMachine(AbstractMachine):
         param_list = cons2list(parameters)
 
         new_stack = state.S.clear()
-        new_env = closure[1].new_level(param_list)
+        new_env = closure.env.new_level(param_list)
         return SECDState(new_stack, new_env, closure[0], new_dump)
 
     def op_RAP(self, state):
@@ -264,8 +268,9 @@ class SECDMachine(AbstractMachine):
         old_code, new_dump = state.D.pop()
         old_env, new_dump = state.D.pop()
         old_stack, new_dump = state.D.pop()
-
-        return SECDState(old_stack, old_env, old_code, new_dump)
+        ret_val, _ = state.S.pop()
+        new_old_stack = old_stack.push(ret_val)
+        return SECDState(new_old_stack, old_env, old_code, new_dump)
 
     def op_DUM(self, state):
         """dum pushes a "dummy", an empty list, in front of the environment
@@ -315,6 +320,16 @@ class SECDMachine(AbstractMachine):
         new_stack = s.push('value', op1 + op2)
         return SECDState(new_stack, state.E, state.C, state.D)
 
+    def op_SUB(self, state):
+        """add pushes the sum of the top two values back onto the stack
+        """
+        op1, s = state.S.pop('value')
+        op2, s = s.pop('value')
+        if not (isinstance(op1, int) and isinstance(op2, int)):
+            raise ValueError("can't take the difference of non-integers")
+        new_stack = s.push('value', op1 - op2)
+        return SECDState(new_stack, state.E, state.C, state.D)
+
     def op_MUL(self, state):
         """mul pushes the product of the top two values back onto the stack
         """
@@ -323,6 +338,16 @@ class SECDMachine(AbstractMachine):
         if not (isinstance(op1, int) and isinstance(op2, int)):
             raise ValueError("can't take the product of non-integers")
         new_stack = s.push('value', op1 + op2)
+        return SECDState(new_stack, state.E, state.C, state.D)
+
+    def op_DIV(self, state):
+        """add pushes the sum of the top two values back onto the stack
+        """
+        op1, s = state.S.pop('value')
+        op2, s = s.pop('value')
+        if not (isinstance(op1, int) and isinstance(op2, int)):
+            raise ValueError("can't take the quotient of non-integers")
+        new_stack = s.push('value', op1 / op2)
         return SECDState(new_stack, state.E, state.C, state.D)
 
     def op_EQ(self, state):
