@@ -122,18 +122,15 @@ instructions = {
 class SECDMachine(AbstractMachine):
 
     def execute(self, instruction, state, verbose=False):
-        if len(instruction) == 2:
-            op_code, args = instruction
-        else:
-            op_code = instruction[0]
-            args = None
-
+        op_code, args = instruction.car, instruction.cdr
         if op_code in ('!', 'HALT'): # halt state
             raise HaltException()
         operator = self.get_operator(op_code)
 
-        new_args = list((args or [])) + [state]
-        return operator(*new_args)
+        if args:
+            return operator(*(cons2list(args) + [state]))
+        else:
+            return operator(state)
 
     def step(self, instruction, state):
         state = self.execute(instruction, state, verbose=True)
@@ -157,12 +154,12 @@ class SECDMachine(AbstractMachine):
             else:
                 executer = self.execute
 
-            while len(state.C):
-                instruction = state.C[0]
+            while state.C is not None:
+                instruction = state.C.car
                 state = executer(instruction,
                                  SECDState(state.S,
                                               state.E,
-                                              state.C[1:],
+                                              state.C.cdr,
                                               state.D))
         except HaltException:
             print ".HALTED"
