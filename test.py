@@ -12,7 +12,7 @@ print "Running", cons2str(c)
 print c
 
 machine = SECDMachine()
-result = machine.go(c)
+result = machine.go(c, step=True)
 print result
 
 

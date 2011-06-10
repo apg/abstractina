@@ -15,15 +15,15 @@ class SECDBackend(Backend):
         raise ValueError("invalid node type found")
 
     def c_Var(self, node, accum):
-        return List('ld', Cons(node.level, node.index),)
+        return Cons(List('ld', Cons(node.level, node.index)), accum)
 
     def c_Const(self, node, accum):
-        return List('ldc', node.value)
+        return Cons('ldc', Cons(node.value, accum))
 
     def __compileBinOp(self, operator, node, accum):
-        right = self.compile(node.right)
-        left = self.compile(node.left)
-        return List(right, left, Cons(operator, None))
+        t1 = Cons(operator, accum)
+        t2 = self.compile(node.right, t1)
+        return self.compile(node.left, t2)
 
     def c_EqOp(self, node, accum):
         return self.__compileBinOp("eq", node, accum)
@@ -48,15 +48,11 @@ class SECDBackend(Backend):
         pass
 
     def c_If(self, node, accum):
-        condition = self.compile(node.condition)
-        consequent = self.compile(node.consequent)
-        alternate = self.compile(node.alternate)
-
-        return List(condition,
-                    List(List('sel'),
-                         List(consequent, List('join')),
-                         List(alternate, List('join'))))
-
+        """CD SEL (CN JOIN) (AL JOIN)"""
+        t1 = self.compile(node.consequent, List("join"))
+        t2 = self.compile(node.alternate, List("join"))
+        t3 = Cons("sel", List(t1, t2))
+        return self.compile(node.condition, t3)
 
 
 

@@ -108,15 +108,11 @@ instructions = {
 class SECDMachine(AbstractMachine):
 
     def execute(self, instruction, state, verbose=False):
-        op_code, args = instruction.car, instruction.cdr
+        op_code = instruction
         if op_code in ('!', 'HALT'): # halt state
             raise HaltException()
         operator = self.get_operator(op_code)
-
-        if args:
-            return operator(*(cons2list(args) + [state]))
-        else:
-            return operator(state)
+        return operator(state)
 
     def step(self, instruction, state):
         state = self.execute(instruction, state, verbose=True)
@@ -142,6 +138,7 @@ class SECDMachine(AbstractMachine):
 
             while state.C is not None:
                 instruction = state.C.car
+                print instruction, "HERE"
                 state = executer(instruction,
                                  SECDState(state.S,
                                               state.E,
@@ -167,21 +164,24 @@ class SECDMachine(AbstractMachine):
         new_stack = state.S.push('value', None)
         return SECDState(new_stack, state.E, state.C, state.D)
 
-    def op_LDC(self, constant, state):
+    def op_LDC(self, state):
         """ldc pushes a constant argument onto the stack"""
+        constant = state.C.car
+        print 'CONSTANT', constant
         new_stack = state.S.push('value', constant)
-        return SECDState(new_stack, state.E, state.C, state.D)
+        return SECDState(new_stack, state.E, state.C.cdr, state.D)
 
-    def op_LD(self, p, state):
+    def op_LD(self, state):
         """ld pushes the value of a variable onto the stack.
 
         The variable is indicated by the argument, a pair. The pair's car
         specifies the level, the cdr the position. So "(1 . 3)" gives the
         current function's (level 1) third parameter.
         """
+        # TODO
         value = state.E[p.car:p.cdr]
         new_stack = state.S.push('value', value)
-        return SECDState(new_stack, state.E, state.C, state.D)
+        return SECDState(new_stack, state.E, state.C.cdr, state.D)
 
     def op_LDF(self, frame, state):
         """ldf takes one list argument representing a function. It
@@ -191,7 +191,7 @@ class SECDMachine(AbstractMachine):
         new_stack = state.S.push('closure', Closure(frame, state.E,))
         return SECDState(new_stack, state.E, state.C, state.D)
 
-    def op_SEL(self, consequent, alternate, state):
+    def op_SEL(self, state):
         """sel expects two list arguments, and pops a value from the stack.
 
         The first list is executed if the popped value was non-nil,
@@ -201,6 +201,8 @@ class SECDMachine(AbstractMachine):
         """
         conditional, new_stack = state.S.pop('value')
         new_dump = state.D.push(state.C)
+        consequent = state.C.cdr.car
+        alternate = state.C.cdr.cdr.car
         new_code = consequent if condtional is None else alternate
         return SECDState(new_stack, state.E, new_code, state.D)
 
