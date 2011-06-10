@@ -37,14 +37,16 @@ def cons2str(c):
 
     buffer.append(obj2str(c.car))
 
-    if not isinstance(c.cdr, Cons):
-        buffer.append(' . ')
-        buffer.append(obj2str(c.cdr))
-    else:
+    t = c.cdr
+    while isinstance(t, Cons):
         buffer.append(' ')
-        buffer.append(cons2str(c.cdr))
+        buffer.append(obj2str(t.car))
+        t = t.cdr
+    else:
+        if t:
+            buffer.append(' . ')
+            buffer.append(obj2str(t))
 
     buffer.append(')')
 
     return ''.join(buffer)
-    

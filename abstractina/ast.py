@@ -9,11 +9,17 @@ class Var(AstNode):
         self.index = index
         self.name = name or 'var-%d-%d' % (level, index)
 
+    def __repr__(self):
+        return '<Var level=%d, index=%d>' % (level, index)
+
 
 class Const(AstNode):
 
     def __init__(self, value):
         self.value = value
+    
+    def __repr__(self):
+        return '<Const: value=%s>' % self.value
 
 
 class BinOp(AstNode):
@@ -21,6 +27,10 @@ class BinOp(AstNode):
     def __init__(self, left, right):
         self.left = left
         self.right = right
+
+    def __repr__(self):
+        return '<%s: left=%s, right=%s>' % \
+            (type(self).__name__, repr(self.left), repr(self.right))
 
 
 class AddOp(BinOp):
@@ -36,6 +46,10 @@ class MultOp(BinOp):
 
 
 class DivOp(BinOp):
+    pass
+
+
+class EqOp(BinOp):
     pass
 
 

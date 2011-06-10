@@ -100,7 +100,7 @@ instructions = {
     'mul': 'MUL',
     'sub': 'SUB',
     'div': 'DIV',
-    'eq': 'eq',
+    'eq': 'EQ',
     'HALT': 'HALT',
 }
 
@@ -151,6 +151,10 @@ class SECDMachine(AbstractMachine):
             print ".HALTED"
         finally:
             return state
+
+    def go(self, code, step=False):
+        state = SECDState(TypedStack(), Environment(), code, Stack())
+        return self.run(state, step)
 
     def dump_state(self, state):
         print 'S: ', state.S
@@ -345,5 +349,5 @@ class SECDMachine(AbstractMachine):
             new_value = 1
         else:
             new_value = None
-        new_stack = new_stack.push('value', new_value)
+        new_stack = s.push('value', new_value)
         return SECDState(new_stack, state.E, state.C, state.D)

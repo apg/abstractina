@@ -15,19 +15,15 @@ class SECDBackend(Backend):
         raise ValueError("invalid node type found")
 
     def c_Var(self, node, accum):
-        return Cons(List('ld', Cons(node.level, node.index),), accum)
+        return List('ld', Cons(node.level, node.index),)
 
     def c_Const(self, node, accum):
-        return Cons(List('ldc', node.value), accum)
+        return List('ldc', node.value)
 
     def __compileBinOp(self, operator, node, accum):
-        right = self.compile(node.right, accum)
-        print right
-        left = self.compile(node.left, accum)
-        print left
-        return Cons(right, 
-                    Cons(left, 
-                         Cons(Cons(operator, None), accum)))
+        right = self.compile(node.right)
+        left = self.compile(node.left)
+        return List(right, left, Cons(operator, None))
 
     def c_EqOp(self, node, accum):
         return self.__compileBinOp("eq", node, accum)
@@ -48,14 +44,21 @@ class SECDBackend(Backend):
         pass
 
     def c_Definition(self, node, accum):
+        """XXX: I guess this has to be a let/letrec.. """
         pass
 
     def c_If(self, node, accum):
-        conditional = self.compile(node.conditional, accum)
-        consequent = self.compile(node.consequent, accum)
-        alternate = []
-        self.compile(node.consequent, consequent)
-        consequent.append(('join',))
-        self.compile(node.alternate, alternate)
-        alternate.append(('join',))
-        accum.append(('sel', consequent, alternate))
+        condition = self.compile(node.condition)
+        consequent = self.compile(node.consequent)
+        alternate = self.compile(node.alternate)
+
+        return List(condition,
+                    List(List('sel'),
+                         List(consequent, List('join')),
+                         List(alternate, List('join'))))
+
+
+
+
+
+
