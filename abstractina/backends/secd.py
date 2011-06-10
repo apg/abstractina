@@ -1,11 +1,11 @@
 from abstractina.backends import Backend
-from abstractina.machines.secd import Cons
+from abstractina.data import Cons, List
 
 
 class SECDBackend(Backend):
 
-    def compile(self, ast):
-        pass
+    def compile(self, ast, accum=None):
+        return self.dispatch(ast, accum)
 
     def dispatch(self, node, accum):
         name = type(node).__name__
@@ -15,55 +15,44 @@ class SECDBackend(Backend):
         raise ValueError("invalid node type found")
 
     def c_Var(self, node, accum):
-        accum.append(('ld', Cons(node.level, node.index),))
+        return Cons(List('ld', Cons(node.level, node.index),), accum)
 
     def c_Const(self, node, accum):
-        accum.append(('ldc', node.value))
+        return Cons(List('ldc', node.value), accum)
+
+    def __compileBinOp(self, operator, node, accum):
+        right = self.compile(node.right, accum)
+        print right
+        left = self.compile(node.left, accum)
+        print left
+        return Cons(right, 
+                    Cons(left, 
+                         Cons(Cons(operator, None), accum)))
+
+    def c_EqOp(self, node, accum):
+        return self.__compileBinOp("eq", node, accum)
 
     def c_AddOp(self, node, accum):
-        left = self.compile(node.left, accum)
-        right = self.compile(node.right, accum)
-        accum.append(('add',))
-
-    def c_MultOp(self, node, accum):
-        left = self.compile(node.left, accum)
-        right = self.compile(node.right, accum)
-        accum.append(('mul',))
+        return self.__compileBinOp("add", node, accum)
 
     def c_SubOp(self, node, accum):
-        left = self.compile(node.left, accum)
-        right = self.compile(node.right, accum)
-        accum.append(('sub',))
+        return self.__compileBinOp("sub", node, accum)
+
+    def c_MultOp(self, node, accum):
+        return self.__compileBinOp("mul", node, accum)
 
     def c_DivOp(self, node, accum):
-        left = self.compile(node.left, accum)
-        right = self.compile(node.right, accum)
-        accum.append(('div',))
+        return self.__compileBinOp("div", node, accum)
 
     def c_Apply(self, node, accum):
-        # compile operands
-        accum.append(('nil',))
-
-        # push operands onto the stack
-        for operand in node.operands:
-            self.compile(operand, accum)
-            accum.append(('cons',))
-
-        # push function onto the stack
-        # TODO figure this out exactly... how do we know where the function is?
-        accum.extend(('ldf', ))
-        accum.extend(('ap',))
+        pass
 
     def c_Definition(self, node, accum):
-        temp_accum = []
-        self.compile(node.body)
-        # this has to go into the environment, but, how how?
-        # TODO
-        accum.append(('ret',))
+        pass
 
     def c_If(self, node, accum):
-        self.compile(node.conditional, accum)
-        consequent = []
+        conditional = self.compile(node.conditional, accum)
+        consequent = self.compile(node.consequent, accum)
         alternate = []
         self.compile(node.consequent, consequent)
         consequent.append(('join',))

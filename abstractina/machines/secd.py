@@ -1,28 +1,14 @@
 from collections import namedtuple
 
+from abstractina.data import Cons, cons2list
 from abstractina.machines import AbstractMachine
 from abstractina.exceptions import HaltException, UnknownInstructionError
 from abstractina.environment import Environment
 from abstractina.stack import TypedStack, Stack
 
 SECDState = namedtuple('MachineState', 'S E C D')
-Cons = namedtuple('Cons', 'car cdr')
 Closure = namedtuple('Closure', 'frame env')
 Instruction = namedtuple('Instruction', 'op_code args')
-
-
-def cons2list(c):
-    """Does a flat mapcar across the cons starting at ``c``
-    
-    If c is not a proper list (e.g. the last cdr is not None), it will not
-    be included.
-    """
-    out = []
-    next = c
-    while isinstance(next, Cons):
-        out.append(next.car)
-        next = next.cdr
-    return out
 
 
 class SECDState(object):
@@ -163,6 +149,8 @@ class SECDMachine(AbstractMachine):
                                               state.D))
         except HaltException:
             print ".HALTED"
+        finally:
+            return state
 
     def dump_state(self, state):
         print 'S: ', state.S
