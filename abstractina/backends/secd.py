@@ -15,7 +15,9 @@ class SECDBackend(Backend):
         raise ValueError("invalid node type found")
 
     def c_Var(self, node, accum):
-        return Cons(List('ld', Cons(node.level, node.index)), accum)
+        return Cons('ld', 
+                    Cons(Cons(node.level, node.index), 
+                         accum))
 
     def c_Const(self, node, accum):
         return Cons('ldc', Cons(node.value, accum))
@@ -41,11 +43,19 @@ class SECDBackend(Backend):
         return self.__compileBinOp("div", node, accum)
 
     def c_Apply(self, node, accum):
-        pass
+        t1 = Cons('ap', accum)
+        t2 = self.compile(node.function, t1)
+        localac = Cons("ldf", t2)        
 
-    def c_Definition(self, node, accum):
-        """XXX: I guess this has to be a let/letrec.. """
-        pass
+        # push arguments
+        for n in node.operands:
+            localac = self.compile(n, Cons("cons", localac))
+
+        return Cons(None, localac)
+
+    def c_Lambda(self, node, accum):
+        t1 = Cons("ret", None)
+        return Cons(self.compile(node.body, t1), accum)
 
     def c_If(self, node, accum):
         """CD SEL (CN JOIN) (AL JOIN)"""

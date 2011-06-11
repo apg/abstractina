@@ -32,6 +32,9 @@ def obj2str(o):
 
 
 def cons2str(c):
+    if c is None:
+        return "nil"
+
     buffer = []
     buffer.append("(")
 

@@ -10,7 +10,7 @@ class Var(AstNode):
         self.name = name or 'var-%d-%d' % (level, index)
 
     def __repr__(self):
-        return '<Var level=%d, index=%d>' % (level, index)
+        return '<Var name=%s, level=%d, index=%d>' % (name, level, index)
 
 
 class Const(AstNode):
@@ -60,11 +60,10 @@ class Apply(AstNode):
         self.operands = operands
 
 
-class Definition(AstNode):
-
-    def __init__(self, name, operands, body):
-        self.name = name
-        self.operands = operands
+class Lambda(AstNode):
+    
+    def __init__(self, parameters, body):
+        self.parameters = parameters
         self.body = body
 
 

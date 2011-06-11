@@ -6,7 +6,7 @@ to only pop and item of a certain type.
 
 class Stack(object):
 
-    __slots__ = ('_parent', '_type', '_item')
+    __slots__ = ('_parent', '_item')
     
     def __init__(self, parent=None):
         self._parent = parent
@@ -21,7 +21,7 @@ class Stack(object):
         return i
 
     def peek(self):
-        return (self._type, self._item)
+        return self._item
 
     def pop(self):
         return self._item, self._parent or Stack()
@@ -30,6 +30,9 @@ class Stack(object):
         new_stack = Stack(parent=self)
         new_stack._item = item
         return new_stack
+
+    def reset(self):
+        return Stack()
 
     def __repr__(self):
         return '[%r %r]' % (self._item, self._parent)
@@ -40,11 +43,13 @@ class TypedStack(Stack):
     restricted popping
     """
 
+    __slots__ = ('_type')
+
     def __init__(self, parent=None):
         super(TypedStack, self).__init__(parent=parent)
 
     def peek(self):
-        return self._item
+        return (self._type, self._item)
 
     def pop(self, type=None):
         if self._parent == None:
@@ -60,3 +65,6 @@ class TypedStack(Stack):
         else:
             new_stack._item = (None, args[0])
         return new_stack
+
+    def reset(self):
+        return TypedStack()

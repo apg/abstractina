@@ -1,6 +1,6 @@
 from collections import namedtuple
 
-from abstractina.data import Cons, cons2list
+from abstractina.data import Cons, cons2list, cons2str
 from abstractina.machines import AbstractMachine
 from abstractina.exceptions import HaltException, UnknownInstructionError
 from abstractina.environment import Environment
@@ -116,14 +116,12 @@ class SECDMachine(AbstractMachine):
 
     def step(self, instruction, state):
         state = self.execute(instruction, state, verbose=True)
-        print state
+        self.dump_state(state)
         raw_input('> press enter to continue <')
         return state
 
     def get_operator(self, op_code):
-        print "op_code: ", op_code
         name = instructions.get(op_code, None)
-        print " name: ", name
         if not name:
             raise UnknownInstructionError("No instruction named '%s'" \
                                               % op_code)
@@ -138,7 +136,6 @@ class SECDMachine(AbstractMachine):
 
             while state.C is not None:
                 instruction = state.C.car
-                print instruction, "HERE"
                 state = executer(instruction,
                                  SECDState(state.S,
                                               state.E,
@@ -146,8 +143,8 @@ class SECDMachine(AbstractMachine):
                                               state.D))
         except HaltException:
             print ".HALTED"
-        finally:
-            return state
+
+        return state
 
     def go(self, code, step=False):
         state = SECDState(TypedStack(), Environment(), code, Stack())
@@ -157,17 +154,17 @@ class SECDMachine(AbstractMachine):
         print 'S: ', state.S
         print 'E: ', state.E
         print 'C: ', state.C
+        print 'C exp: ', cons2str(state.C)
         print 'D: ', state.D
 
     def op_NIL(self, state):
         """nil pushes a nil pointer onto the stack"""
         new_stack = state.S.push('value', None)
-        return SECDState(new_stack, state.E, state.C, state.D)
+        return SECDState(new_stack, state.E, state.C.cdr, state.D)
 
     def op_LDC(self, state):
         """ldc pushes a constant argument onto the stack"""
         constant = state.C.car
-        print 'CONSTANT', constant
         new_stack = state.S.push('value', constant)
         return SECDState(new_stack, state.E, state.C.cdr, state.D)
 
@@ -178,8 +175,8 @@ class SECDMachine(AbstractMachine):
         specifies the level, the cdr the position. So "(1 . 3)" gives the
         current function's (level 1) third parameter.
         """
-        # TODO
-        value = state.E[p.car:p.cdr]
+        var = state.C.car
+        value = state.E[var.car:var.cdr]
         new_stack = state.S.push('value', value)
         return SECDState(new_stack, state.E, state.C.cdr, state.D)
 
@@ -200,10 +197,13 @@ class SECDMachine(AbstractMachine):
         is saved on the dump.
         """
         conditional, new_stack = state.S.pop('value')
-        new_dump = state.D.push(state.C)
-        consequent = state.C.cdr.car
-        alternate = state.C.cdr.cdr.car
-        new_code = consequent if condtional is None else alternate
+
+        new_dump = state.D.push(state.C.cdr.cdr)
+
+        consequent = state.C.car
+        alternate = state.C.cdr.car
+
+        new_code = alternate if conditional is None else consequent
         return SECDState(new_stack, state.E, new_code, state.D)
 
     def op_JOIN(self, state):
@@ -232,7 +232,7 @@ class SECDMachine(AbstractMachine):
             raise ValueError("top of stack expected to be a cons")
         param_list = cons2list(parameters)
 
-        new_stack = state.S.clear()
+        new_stack = state.S.reset()
         new_env = closure.env.new_level(param_list)
         return SECDState(new_stack, new_env, closure[0], new_dump)
 
@@ -248,7 +248,7 @@ class SECDMachine(AbstractMachine):
             raise ValueError("top of stack expected to be a cons")
         param_list = cons2list(parameters)
 
-        new_stack = state.S.clear()
+        new_stack = state.S.reset()
         new_env = closure[1].replace_level(param_list)
         return SECDState(new_stack, new_env, closure[0], new_dump)
 
@@ -268,7 +268,7 @@ class SECDMachine(AbstractMachine):
         list.
         """
         new_env = state.E.new_level()
-        return SECDState(state.S, new_env, state.C, state.D)
+        return SECDState(state.S, new_env, state.C.cdr, state.D)
 
     def op_CONS(self, state):
         """cons pushes a cons to the stack made from the 2 top values of the
@@ -281,7 +281,7 @@ class SECDMachine(AbstractMachine):
         cdr, s = s.pop('value')
 
         new_stack = s.push('value', Cons(car, cdr))
-        return SECDState(new_stack, state.E, state.C, state.D)
+        return SECDState(new_stack, state.E, state.C.cdr, state.D)
 
     def op_CAR(self, state):
         """car pushes the car of a the cons on the top of the stack
@@ -290,7 +290,7 @@ class SECDMachine(AbstractMachine):
         if not isinstance(cons, Cons):
             raise ValueError("top value of the stack not a cons")
         new_stack = s.push('value', cons.car)
-        return SECDState(new_stack, state.E, state.C, state.D)
+        return SECDState(new_stack, state.E, state.C.cdr, state.D)
 
     def op_CDR(self, state):
         """car pushes the car of a the cons on the top of the stack
@@ -299,7 +299,7 @@ class SECDMachine(AbstractMachine):
         if not isinstance(cons, Cons):
             raise ValueError("top value of the stack not a cons")
         new_stack = s.push('value', cons.cdr)
-        return SECDState(new_stack, state.E, state.C, state.D)
+        return SECDState(new_stack, state.E, state.C.cdr, state.D)
 
     def op_ADD(self, state):
         """add pushes the sum of the top two values back onto the stack
