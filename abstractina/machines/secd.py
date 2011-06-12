@@ -122,7 +122,7 @@ class SECDMachine(AbstractMachine):
 
     def get_operator(self, op_code):
         name = instructions.get(op_code, None)
-        if not name:
+        if name is None:
             raise UnknownInstructionError("No instruction named '%s'" \
                                               % op_code)
         return getattr(self, 'op_%s' % name)
@@ -136,6 +136,9 @@ class SECDMachine(AbstractMachine):
 
             while state.C is not None:
                 instruction = state.C.car
+                if instruction is None:
+                    instruction = 'nil'
+
                 state = executer(instruction,
                                  SECDState(state.S,
                                               state.E,
@@ -160,7 +163,7 @@ class SECDMachine(AbstractMachine):
     def op_NIL(self, state):
         """nil pushes a nil pointer onto the stack"""
         new_stack = state.S.push('value', None)
-        return SECDState(new_stack, state.E, state.C.cdr, state.D)
+        return SECDState(new_stack, state.E, state.C, state.D)
 
     def op_LDC(self, state):
         """ldc pushes a constant argument onto the stack"""
@@ -180,13 +183,14 @@ class SECDMachine(AbstractMachine):
         new_stack = state.S.push('value', value)
         return SECDState(new_stack, state.E, state.C.cdr, state.D)
 
-    def op_LDF(self, frame, state):
+    def op_LDF(self, state):
         """ldf takes one list argument representing a function. It
         constructs a closure (a pair containing the function and the current
         environment) and pushes that onto the stack.
         """
+        frame = state.C.car
         new_stack = state.S.push('closure', Closure(frame, state.E,))
-        return SECDState(new_stack, state.E, state.C, state.D)
+        return SECDState(new_stack, state.E, state.C.cdr, state.D)
 
     def op_SEL(self, state):
         """sel expects two list arguments, and pops a value from the stack.
@@ -226,12 +230,13 @@ class SECDMachine(AbstractMachine):
         the next value of C are saved on the dump.
         """
         new_dump = state.D.push(state.S).push(state.E).push(state.C)
-        closure, new_stack = state.S.pop('closure')
-        parameters, new_stack = state.S.pop('value')
+        closure, tmp_stack = state.S.pop('closure')
+        parameters, _ = tmp_stack.pop('value')
+
         if not isinstance(parameters, Cons):
             raise ValueError("top of stack expected to be a cons")
-        param_list = cons2list(parameters)
 
+        param_list = cons2list(parameters)
         new_stack = state.S.reset()
         new_env = closure.env.new_level(param_list)
         return SECDState(new_stack, new_env, closure[0], new_dump)
@@ -244,6 +249,7 @@ class SECDMachine(AbstractMachine):
         new_dump = state.D.push(state.S).push(state.E).push(state.C)
         closure, new_stack = state.S.pop('closure')
         parameters, new_stack = state.S.pop('value')
+
         if not isinstance(parameters, Cons):
             raise ValueError("top of stack expected to be a cons")
         param_list = cons2list(parameters)
@@ -257,10 +263,13 @@ class SECDMachine(AbstractMachine):
         from the dump, and pushes the return value onto the now-current stack.
         """
         old_code, new_dump = state.D.pop()
-        old_env, new_dump = state.D.pop()
-        old_stack, new_dump = state.D.pop()
-        ret_val, _ = state.S.pop()
-        new_old_stack = old_stack.push(ret_val)
+        old_env, new_dump = new_dump.pop()
+        old_stack, new_dump = new_dump.pop()
+
+        kind, val = state.S.peek()
+        ret_val, _ = state.S.pop(kind)
+
+        new_old_stack = old_stack.push(kind, ret_val)
         return SECDState(new_old_stack, old_env, old_code, new_dump)
 
     def op_DUM(self, state):
@@ -281,7 +290,7 @@ class SECDMachine(AbstractMachine):
         cdr, s = s.pop('value')
 
         new_stack = s.push('value', Cons(car, cdr))
-        return SECDState(new_stack, state.E, state.C.cdr, state.D)
+        return SECDState(new_stack, state.E, state.C, state.D)
 
     def op_CAR(self, state):
         """car pushes the car of a the cons on the top of the stack
@@ -290,7 +299,7 @@ class SECDMachine(AbstractMachine):
         if not isinstance(cons, Cons):
             raise ValueError("top value of the stack not a cons")
         new_stack = s.push('value', cons.car)
-        return SECDState(new_stack, state.E, state.C.cdr, state.D)
+        return SECDState(new_stack, state.E, state.C, state.D)
 
     def op_CDR(self, state):
         """car pushes the car of a the cons on the top of the stack
@@ -299,7 +308,7 @@ class SECDMachine(AbstractMachine):
         if not isinstance(cons, Cons):
             raise ValueError("top value of the stack not a cons")
         new_stack = s.push('value', cons.cdr)
-        return SECDState(new_stack, state.E, state.C.cdr, state.D)
+        return SECDState(new_stack, state.E, state.C, state.D)
 
     def op_ADD(self, state):
         """add pushes the sum of the top two values back onto the stack

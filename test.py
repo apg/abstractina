@@ -33,5 +33,7 @@ s = Apply(Lambda(['x', 'y'], AddOp(Var(1, 1, 'x'), Var(1, 2, 'y'))),
           [Const(5), Const(5)])
 c = compiler.compile(s)
 print "Running", cons2str(c)
+print c
+result = machine.go(c, step=False)
 val, _ = result.S.pop('value')
 print 'RESULT (expecting 10): ', val

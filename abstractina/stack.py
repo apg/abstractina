@@ -47,6 +47,7 @@ class TypedStack(Stack):
 
     def __init__(self, parent=None):
         super(TypedStack, self).__init__(parent=parent)
+        self._type = None
 
     def peek(self):
         return (self._type, self._item)
@@ -54,16 +55,18 @@ class TypedStack(Stack):
     def pop(self, type=None):
         if self._parent == None:
             raise IndexError("Nothing left on the stack")
-        if self._item[0] == type:
-            return self._item[1], self._parent or TypedStack()
+        if self._type == type:
+            return self._item, self._parent or TypedStack()
         raise ValueError("Couldn't pop value of type '%s'" % type)
 
     def push(self, *args):
         new_stack = TypedStack(parent=self)
         if len(args) == 2:
-            new_stack._item = (args[0], args[1])
+            new_stack._type = args[0]
+            new_stack._item = args[1]
         else:
-            new_stack._item = (None, args[0])
+            new_stack._type = None
+            new_stack._item = args[0]
         return new_stack
 
     def reset(self):

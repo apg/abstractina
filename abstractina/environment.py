@@ -19,12 +19,12 @@ class Environment(object):
 
     def __getslice__(self, levels_up, offset):
         this = self
-
+        levels_up -= 1 # we start at 0, but they start at 1
         while levels_up > 0 and this != None:
             this = this._parent
             levels_up -= 1
 
-        return this._level[offset]
+        return this._level[offset - 1]
 
     def __getitem__(self, i):
         print "called getitem", i

@@ -20,6 +20,8 @@ class SECDBackend(Backend):
                          accum))
 
     def c_Const(self, node, accum):
+        if node.value is None:
+            return Cons('nil', accum)
         return Cons('ldc', Cons(node.value, accum))
 
     def __compileBinOp(self, operator, node, accum):
@@ -63,8 +65,3 @@ class SECDBackend(Backend):
         t2 = self.compile(node.alternate, List("join"))
         t3 = Cons("sel", List(t1, t2))
         return self.compile(node.condition, t3)
-
-
-
-
-
