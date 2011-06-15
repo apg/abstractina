@@ -3,7 +3,7 @@ from collections import namedtuple
 from abstractina.data import Cons, cons2list, cons2str
 from abstractina.machines import AbstractMachine
 from abstractina.exceptions import HaltException, UnknownInstructionError
-from abstractina.environment import Environment
+from abstractina.environment import IndexedEnvironment as Environment
 from abstractina.stack import TypedStack, Stack
 
 SECDState = namedtuple('MachineState', 'S E C D')

@@ -4,10 +4,8 @@ class AstNode(object):
 
 class Var(AstNode):
 
-    def __init__(self, level, index, name=None):
-        self.level = level
-        self.index = index
-        self.name = name or 'var-%d-%d' % (level, index)
+    def __init__(self, name):
+        self.name = name
 
     def __repr__(self):
         return '<Var name=%s, level=%d, index=%d>' % (name, level, index)
@@ -66,6 +64,18 @@ class Lambda(AstNode):
         self.parameters = parameters
         self.body = body
 
+
+class Let(AstNode):
+    
+    def __init__(self, parameters, values, body):
+        self.parameters = parameters
+        self.values = values
+        self.body = body
+
+
+class LetRec(Let):
+    pass
+        
 
 class If(AstNode):
 
