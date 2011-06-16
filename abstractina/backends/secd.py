@@ -33,8 +33,8 @@ class SECDBackend(Backend):
 
     def __compileBinOp(self, operator, node, accum, env):
         t1 = Cons(operator, accum)
-        t2 = self.compile(node.right, t1, env)
-        return self.compile(node.left, t2, env)
+        t2 = self.compile(node.left, t1, env)
+        return self.compile(node.right, t2, env)
 
     def c_EqOp(self, node, accum, env):
         return self.__compileBinOp("eq", node, accum, env)
@@ -70,10 +70,30 @@ class SECDBackend(Backend):
                         accum)
 
     def c_Let(self, node, accum, env):
-        pass
+        t1 = Cons('ap', accum)
+        t2 = Cons('ret', None)
+        t3 = self.compile(node.body, t2, 
+                          env.new_level(node.parameters))
+        localac = Cons("ldf", Cons(t3, t1))
+
+        # push arguments
+        for n in node.values:
+            localac = self.compile(n, Cons("cons", localac))
+
+        return Cons(None, localac)
 
     def c_LetRec(self, node, accum, env):
-        pass
+        t1 = Cons('rap', accum)
+        t2 = Cons('ret', None)
+        t3 = self.compile(node.body, t2, 
+                          env.new_level(node.parameters))
+        localac = Cons("ldf", Cons(t3, t1))
+
+        # push arguments
+        for n in node.values:
+            localac = self.compile(n, Cons("cons", localac))
+
+        return Cons('dum', Cons(None, localac))
 
     def c_If(self, node, accum, env):
         t1 = self.compile(node.consequent, List("join"))

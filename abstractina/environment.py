@@ -22,7 +22,6 @@ class IndexedEnvironment(object):
             this = this._parent
             levels_up -= 1
 
-        print "LOOKING UP %d in %r" % (offset, this._level)
         return this._level[offset - 1]
 
     def __getitem__(self, i):
@@ -50,15 +49,15 @@ class NameLookupEnvironment(object):
 
     def __getitem__(self, name):
         this = self
-        level = 0
+        level = 1
         offset = -1
         
-        while this != None:
-            this = this._parent
-            if name in self._level:
-                offset = self._level.index(name) + 1
-                level += 1
+        while this is not None:
+            if name in this._level:
+                offset = this._level.index(name) + 1
                 break
+            level += 1
+            this = this._parent
 
         # 1 based, offset of -1 is nameerror
         return (level, offset)

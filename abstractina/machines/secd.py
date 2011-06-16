@@ -101,6 +101,7 @@ instructions = {
     'sub': 'SUB',
     'div': 'DIV',
     'eq': 'EQ',
+    'atom': 'ATOM',
     'HALT': 'HALT',
 }
 
@@ -360,5 +361,18 @@ class SECDMachine(AbstractMachine):
             new_value = 1
         else:
             new_value = None
+        new_stack = s.push('value', new_value)
+        return SECDState(new_stack, state.E, state.C, state.D)
+
+    def op_ATOM(self, state):
+        """eq pushes a non nil value to the stack if the top 2 stack
+        values are equal. pushes nil (None) otherwise.
+        """
+        op1, s = state.S.pop('value')
+        if isinstance(op1, int) or op1 is None:
+            new_value = 1
+        else:
+            new_value = None
+
         new_stack = s.push('value', new_value)
         return SECDState(new_stack, state.E, state.C, state.D)

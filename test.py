@@ -38,3 +38,19 @@ print c
 result = machine.go(c, step=False)
 val, _ = result.S.pop('value')
 print 'RESULT (expecting 10): ', val
+
+
+
+
+print
+print "LET'S TEST LET"
+
+s = Let(['z'], [Const(6)],
+        Let(['x', 'y'], [Const(3), Const(5)],
+            AddOp(Var('z'), SubOp(Var('x'), Var('y')))))
+c = compiler.compile(s, env=NameLookupEnvironment())
+print "Running", cons2str(c)
+print c
+result = machine.go(c, step=False)
+val, _ = result.S.pop('value')
+print 'RESULT (expecting 4): ', val
