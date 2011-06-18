@@ -2,6 +2,7 @@ from abstractina.backends import Backend
 from abstractina.data import Cons, List
 from abstractina.environment import NameLookupEnvironment, \
     IndexedEnvironment
+from abstractina.ast import Var
 
 
 class SECDBackend(Backend):
@@ -54,7 +55,11 @@ class SECDBackend(Backend):
     def c_Apply(self, node, accum, env):
         t1 = Cons('ap', accum)
         t2 = self.compile(node.function, t1, env)
-        localac = Cons("ldf", t2)        
+
+        if not isinstance(node.function, Var):
+            localac = Cons("ldf", t2)
+        else:
+            localac = t2
 
         # push arguments
         for n in node.operands:
@@ -85,13 +90,13 @@ class SECDBackend(Backend):
     def c_LetRec(self, node, accum, env):
         t1 = Cons('rap', accum)
         t2 = Cons('ret', None)
-        t3 = self.compile(node.body, t2, 
-                          env.new_level(node.parameters))
+        e = env.new_level(node.parameters)
+        t3 = self.compile(node.body, t2, e)
         localac = Cons("ldf", Cons(t3, t1))
 
         # push arguments
         for n in node.values:
-            localac = self.compile(n, Cons("cons", localac))
+            localac = Cons("ldf", self.compile(n, Cons("cons", localac), e))
 
         return Cons('dum', Cons(None, localac))
 

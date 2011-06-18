@@ -4,7 +4,7 @@ from abstractina.data import Cons, cons2list, cons2str
 from abstractina.machines import AbstractMachine
 from abstractina.exceptions import HaltException, UnknownInstructionError
 from abstractina.environment import IndexedEnvironment as Environment
-from abstractina.stack import TypedStack, Stack
+from abstractina.stack import Stack
 
 SECDState = namedtuple('MachineState', 'S E C D')
 Closure = namedtuple('Closure', 'frame env')
@@ -26,8 +26,8 @@ class SECDState(object):
         return self._S
 
     def _set_S(self, s):
-        if not isinstance(s, TypedStack):
-            raise TypeError("S must be a TypedStack")
+        if not isinstance(s, Stack):
+            raise TypeError("S must be a Stack")
         self._S = s
 
     S = property(_get_S, _set_S)
@@ -92,6 +92,7 @@ instructions = {
     'join': 'JOIN',
     'sel': 'SEL',
     'ap': 'AP',
+    'rap': 'RAP',
     'ret': 'RET',
     'cons': 'CONS',
     'car': 'CAR',
@@ -125,7 +126,7 @@ class SECDMachine(AbstractMachine):
         name = instructions.get(op_code, None)
         if name is None:
             raise UnknownInstructionError("No instruction named '%s'" \
-                                              % op_code)
+                                              % (op_code))
         return getattr(self, 'op_%s' % name)
 
     def run(self, state, step=False):
@@ -151,7 +152,7 @@ class SECDMachine(AbstractMachine):
         return state
 
     def go(self, code, step=False):
-        state = SECDState(TypedStack(), Environment(), code, Stack())
+        state = SECDState(Stack(), Environment(), code, Stack())
         return self.run(state, step)
 
     def dump_state(self, state):
@@ -163,13 +164,13 @@ class SECDMachine(AbstractMachine):
 
     def op_NIL(self, state):
         """nil pushes a nil pointer onto the stack"""
-        new_stack = state.S.push('value', None)
+        new_stack = state.S.push(None)
         return SECDState(new_stack, state.E, state.C, state.D)
 
     def op_LDC(self, state):
         """ldc pushes a constant argument onto the stack"""
         constant = state.C.car
-        new_stack = state.S.push('value', constant)
+        new_stack = state.S.push(constant)
         return SECDState(new_stack, state.E, state.C.cdr, state.D)
 
     def op_LD(self, state):
@@ -181,7 +182,7 @@ class SECDMachine(AbstractMachine):
         """
         var = state.C.car
         value = state.E[var.car:var.cdr]
-        new_stack = state.S.push('value', value)
+        new_stack = state.S.push(value)
         return SECDState(new_stack, state.E, state.C.cdr, state.D)
 
     def op_LDF(self, state):
@@ -190,7 +191,7 @@ class SECDMachine(AbstractMachine):
         environment) and pushes that onto the stack.
         """
         frame = state.C.car
-        new_stack = state.S.push('closure', Closure(frame, state.E,))
+        new_stack = state.S.push(Closure(frame, state.E,))
         return SECDState(new_stack, state.E, state.C.cdr, state.D)
 
     def op_SEL(self, state):
@@ -201,7 +202,7 @@ class SECDMachine(AbstractMachine):
         is made the new C, a pointer to the instruction following sel
         is saved on the dump.
         """
-        conditional, new_stack = state.S.pop('value')
+        conditional, new_stack = state.S.pop()
 
         new_dump = state.D.push(state.C.cdr.cdr)
 
@@ -231,8 +232,8 @@ class SECDMachine(AbstractMachine):
         the next value of C are saved on the dump.
         """
         new_dump = state.D.push(state.S).push(state.E).push(state.C)
-        closure, tmp_stack = state.S.pop('closure')
-        parameters, _ = tmp_stack.pop('value')
+        closure, tmp_stack = state.S.pop()
+        parameters, _ = tmp_stack.pop()
 
         if not isinstance(parameters, Cons):
             raise ValueError("top of stack expected to be a cons")
@@ -240,7 +241,7 @@ class SECDMachine(AbstractMachine):
         param_list = cons2list(parameters)
         new_stack = state.S.reset()
         new_env = closure.env.new_level(param_list)
-        return SECDState(new_stack, new_env, closure[0], new_dump)
+        return SECDState(new_stack, new_env, closure.frame, new_dump)
 
     def op_RAP(self, state):
         """rap works like ap, only that it replaces an occurrence of a
@@ -248,16 +249,16 @@ class SECDMachine(AbstractMachine):
         functions possible
         """
         new_dump = state.D.push(state.S).push(state.E).push(state.C)
-        closure, new_stack = state.S.pop('closure')
-        parameters, new_stack = state.S.pop('value')
+        closure, new_stack = state.S.pop()
+        parameters, new_stack = new_stack.pop()
 
         if not isinstance(parameters, Cons):
             raise ValueError("top of stack expected to be a cons")
         param_list = cons2list(parameters)
 
         new_stack = state.S.reset()
-        new_env = closure[1].replace_level(param_list)
-        return SECDState(new_stack, new_env, closure[0], new_dump)
+        new_env = closure.env.replace_level(param_list)
+        return SECDState(new_stack, new_env, closure.frame, new_dump)
 
     def op_RET(self, state):
         """ret pops one return value from the stack, restores S, E, and C
@@ -267,10 +268,9 @@ class SECDMachine(AbstractMachine):
         old_env, new_dump = new_dump.pop()
         old_stack, new_dump = new_dump.pop()
 
-        kind, val = state.S.peek()
-        ret_val, _ = state.S.pop(kind)
+        ret_val, _ = state.S.pop()
 
-        new_old_stack = old_stack.push(kind, ret_val)
+        new_old_stack = old_stack.push(ret_val)
         return SECDState(new_old_stack, old_env, old_code, new_dump)
 
     def op_DUM(self, state):
@@ -287,92 +287,89 @@ class SECDMachine(AbstractMachine):
         The car of the cons will be the top value on the stack.
         The cdr of the cons will be the second value on the stack.
         """
-        car, s = state.S.pop('value')
-        cdr, s = s.pop('value')
+        car, s = state.S.pop()
+        cdr, s = s.pop()
 
-        new_stack = s.push('value', Cons(car, cdr))
+        new_stack = s.push(Cons(car, cdr))
         return SECDState(new_stack, state.E, state.C, state.D)
 
     def op_CAR(self, state):
         """car pushes the car of a the cons on the top of the stack
         """
-        cons, s = state.S.pop('value')
+        cons, s = state.S.pop()
         if not isinstance(cons, Cons):
             raise ValueError("top value of the stack not a cons")
-        new_stack = s.push('value', cons.car)
+        new_stack = s.push(cons.car)
         return SECDState(new_stack, state.E, state.C, state.D)
 
     def op_CDR(self, state):
         """car pushes the car of a the cons on the top of the stack
         """
-        cons, s = state.S.pop('value')
+        cons, s = state.S.pop()
         if not isinstance(cons, Cons):
             raise ValueError("top value of the stack not a cons")
-        new_stack = s.push('value', cons.cdr)
+        new_stack = s.push(cons.cdr)
         return SECDState(new_stack, state.E, state.C, state.D)
 
     def op_ADD(self, state):
         """add pushes the sum of the top two values back onto the stack
         """
-        op1, s = state.S.pop('value')
-        op2, s = s.pop('value')
+        op1, s = state.S.pop()
+        op2, s = s.pop()
         if not (isinstance(op1, int) and isinstance(op2, int)):
             raise ValueError("can't take the sum of non-integers")
-        new_stack = s.push('value', op1 + op2)
+        new_stack = s.push(op1 + op2)
         return SECDState(new_stack, state.E, state.C, state.D)
 
     def op_SUB(self, state):
         """add pushes the sum of the top two values back onto the stack
         """
-        op1, s = state.S.pop('value')
-        op2, s = s.pop('value')
+        op1, s = state.S.pop()
+        op2, s = s.pop()
         if not (isinstance(op1, int) and isinstance(op2, int)):
             raise ValueError("can't take the difference of non-integers")
-        new_stack = s.push('value', op1 - op2)
+        new_stack = s.push(op1 - op2)
         return SECDState(new_stack, state.E, state.C, state.D)
 
     def op_MUL(self, state):
         """mul pushes the product of the top two values back onto the stack
         """
-        op1, s = state.S.pop('value')
-        op2, s = s.pop('value')
+        op1, s = state.S.pop()
+        op2, s = s.pop()
         if not (isinstance(op1, int) and isinstance(op2, int)):
             raise ValueError("can't take the product of non-integers")
-        new_stack = s.push('value', op1 + op2)
+        new_stack = s.push(op1 + op2)
         return SECDState(new_stack, state.E, state.C, state.D)
 
     def op_DIV(self, state):
         """add pushes the sum of the top two values back onto the stack
         """
-        op1, s = state.S.pop('value')
-        op2, s = s.pop('value')
+        op1, s = state.S.pop()
+        op2, s = s.pop()
         if not (isinstance(op1, int) and isinstance(op2, int)):
             raise ValueError("can't take the quotient of non-integers")
-        new_stack = s.push('value', op1 / op2)
+        new_stack = s.push(op1 / op2)
         return SECDState(new_stack, state.E, state.C, state.D)
 
     def op_EQ(self, state):
         """eq pushes a non nil value to the stack if the top 2 stack
         values are equal. pushes nil (None) otherwise.
         """
-        op1, s = state.S.pop('value')
-        op2, s = s.pop('value')
+        op1, s = state.S.pop()
+        op2, s = s.pop()
         if op1 == op2:
             new_value = 1
         else:
             new_value = None
-        new_stack = s.push('value', new_value)
+        new_stack = s.push(new_value)
         return SECDState(new_stack, state.E, state.C, state.D)
 
     def op_ATOM(self, state):
-        """eq pushes a non nil value to the stack if the top 2 stack
-        values are equal. pushes nil (None) otherwise.
-        """
-        op1, s = state.S.pop('value')
-        if isinstance(op1, int) or op1 is None:
+        op1, s = state.S.pop()
+        if isinstance(op1, str):
             new_value = 1
         else:
             new_value = None
 
-        new_stack = s.push('value', new_value)
+        new_stack = s.push(new_value)
         return SECDState(new_stack, state.E, state.C, state.D)
